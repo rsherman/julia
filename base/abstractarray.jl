@@ -114,40 +114,38 @@ linearindexing{A<:Array}(::Type{A}) = LinearFast()
 linearindexing{A<:Range}(::Type{A}) = LinearFast()
 
 ## Bounds checking ##
-checkbounds(sz::Int, i::Int) = 1 <= i <= sz || throw(BoundsError())
-checkbounds(sz::Int, i::Real) = checkbounds(sz, to_index(i))
-checkbounds(sz::Int, I::AbstractVector{Bool}) = length(I) == sz || throw(BoundsError())
-checkbounds(sz::Int, r::Range{Int}) = isempty(r) || (minimum(r) >= 1 && maximum(r) <= sz) || throw(BoundsError())
-checkbounds{T<:Real}(sz::Int, r::Range{T}) = checkbounds(sz, to_index(r))
-checkbounds(sc::Int, ::Colon) = true
-
-function checkbounds{T <: Real}(sz::Int, I::AbstractArray{T})
+_checkbounds(sz::Int, i::Int) = 1 <= i <= sz
+_checkbounds(sz::Int, i::Real) = _checkbounds(sz, to_index(i))
+_checkbounds(sz::Int, I::AbstractVector{Bool}) = length(I) == sz
+_checkbounds(sz::Int, r::Range{Int}) = isempty(r) || (minimum(r) >= 1 && maximum(r) <= sz)
+_checkbounds{T<:Real}(sz::Int, r::Range{T}) = _checkbounds(sz, to_index(r))
+_checkbounds(sz::Int, ::Colon) = true
+function _checkbounds{T <: Real}(sz::Int, I::AbstractArray{T})
+    b = true
     for i in I
-        checkbounds(sz, i)
+        b &= _checkbounds(sz, i)
     end
+    b
 end
 
-checkbounds(A::AbstractArray, I::AbstractArray{Bool}) = size(A) == size(I) || throw(BoundsError())
-
-checkbounds(A::AbstractArray, I) = checkbounds(length(A), I)
-
+checkbounds(A::AbstractArray, I::AbstractArray{Bool}) = size(A) == size(I) || throw(BoundsError(A, I))
+checkbounds(A::AbstractArray, I::AbstractVector{Bool}) = length(A) == length(I) || throw(BoundsError(A, I))
+checkbounds(A::AbstractArray, I) = _checkbounds(length(A), I) || throw(BoundsError(A, I))
 function checkbounds(A::AbstractMatrix, I::Union(Real,AbstractArray,Colon), J::Union(Real,AbstractArray,Colon))
-    checkbounds(size(A,1), I)
-    checkbounds(size(A,2), J)
+    _checkbounds(size(A,1), I) || throw(BoundsError(A, (I, J)))
+    _checkbounds(size(A,2), J) || throw(BoundsError(A, (I, J)))
 end
-
 function checkbounds(A::AbstractArray, I::Union(Real,AbstractArray,Colon), J::Union(Real,AbstractArray,Colon))
-    checkbounds(size(A,1), I)
-    checkbounds(trailingsize(A,2), J)
+    _checkbounds(size(A,1), I) || throw(BoundsError(A, (I, J)))
+    _checkbounds(trailingsize(A,2), J) || throw(BoundsError(A, (I, J)))
 end
-
 function checkbounds(A::AbstractArray, I::Union(Real,AbstractArray,Colon)...)
     n = length(I)
     if n > 0
         for dim = 1:(n-1)
-            checkbounds(size(A,dim), I[dim])
+            _checkbounds(size(A,dim), I[dim]) || throw(BoundsError(A, I))
         end
-        checkbounds(trailingsize(A,n), I[n])
+        _checkbounds(trailingsize(A,n), I[n]) || throw(BoundsError(A, I))
     end
 end
 
