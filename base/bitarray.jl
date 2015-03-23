@@ -351,56 +351,6 @@ end
     return unsafe_bitgetindex(B.chunks, i)
 end
 
-getindex(B::BitArray, i::Real) = getindex(B, to_index(i))
-
-getindex(B::BitArray) = getindex(B, 1)
-
-# 0d bitarray
-getindex(B::BitArray{0}) = unsafe_bitgetindex(B.chunks, 1)
-
-function getindex{T<:Real}(B::BitArray, I::AbstractVector{T})
-    X = BitArray(length(I))
-    lB = length(B)
-    Xc = X.chunks
-    Bc = B.chunks
-    ind = 1
-    for i in I
-        # faster X[ind] = B[i]
-        j = to_index(i)
-        1 <= j <= lB || throw(BoundsError(B, j))
-        unsafe_bitsetindex!(Xc, unsafe_bitgetindex(Bc, j), ind)
-        ind += 1
-    end
-    return X
-end
-
-# logical indexing
-# (when the indexing is provided as an Array{Bool} or a BitArray we can be
-# sure about the behaviour and use unsafe_getindex; in the general case
-# we can't and must use getindex, otherwise silent corruption can happen)
-# (multiple signatures for disambiguation)
-for IT in [AbstractVector{Bool}, AbstractArray{Bool}]
-    @eval stagedfunction getindex(B::BitArray, I::$IT)
-        idxop = I <: Union(Array{Bool}, BitArray) ? :unsafe_getindex : :getindex
-        quote
-            checkbounds(B, I)
-            n = sum(I)
-            X = BitArray(n)
-            Xc = X.chunks
-            Bc = B.chunks
-            ind = 1
-            for i = 1:length(I)
-                if $idxop(I, i)
-                    # faster X[ind] = B[i]
-                    unsafe_bitsetindex!(Xc, unsafe_bitgetindex(Bc, i), ind)
-                    ind += 1
-                end
-            end
-            return X
-        end
-    end
-end
-
 ## Indexing: setindex! ##
 
 @inline function unsafe_bitsetindex!(Bc::Array{UInt64}, x::Bool, i::Int)
