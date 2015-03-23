@@ -277,6 +277,8 @@ function check_indexingrange(s, r)
     sl
 end
 
+getindex(r::Range, ::Colon) = copy(r)
+
 function getindex(r::UnitRange, s::UnitRange{Int})
     sl = check_indexingrange(s, r)
     st = oftype(r.start, r.start + s.start-1)
